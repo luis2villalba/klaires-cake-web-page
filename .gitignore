@@ -1,0 +1,9 @@
+# Ignore local config with secrets
+/config/mail.php
+
+# Node / Composer / OS files
+node_modules/
+vendor/
+.DS_Store
+Thumbs.db
+

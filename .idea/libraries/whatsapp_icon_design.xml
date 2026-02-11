@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="whatsapp-icon-design">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/assets/img/whatsapp-icon-design.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
