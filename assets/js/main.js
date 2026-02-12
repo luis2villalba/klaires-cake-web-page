@@ -220,13 +220,4 @@
     mirror: false
   });
 
-  // Enhanced navbar styling for new design
-  $(window).on('scroll', function() {
-    if ($(this).scrollTop() > 100) {
-      $('#mainNavbar').addClass('scrolled');
-    } else {
-      $('#mainNavbar').removeClass('scrolled');
-    }
-  });
-
 })(jQuery);
