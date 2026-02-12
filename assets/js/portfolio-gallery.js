@@ -47,6 +47,17 @@ function prepareStaticImages() {
   allImages = Array.isArray(STATIC_IMAGES) ? STATIC_IMAGES.slice() : [];
   imagesLoaded = allImages.length > 0;
   console.log(`Imágenes estáticas cargadas: ${allImages.length}`);
+
+  // Preload images to warm browser cache and avoid flashes when swapping
+  try {
+    allImages.forEach(url => {
+      try {
+        const p = new Image();
+        p.src = url;
+      } catch (e) { /* ignore individual preload errors */ }
+    });
+  } catch (e) { /* ignore */ }
+
   return imagesLoaded;
 }
 
@@ -183,14 +194,14 @@ function updateCarousel() {
     const url = allImages[currentImageIndex];
     console.log('Cargando imagen', currentImageIndex + 1, 'de', allImages.length, ':', url);
 
-    // Mostrar placeholder y ocultar imagen hasta que cargue
+    // Show placeholder overlay but DO NOT hide the visible image immediately (avoid blank flash)
     if (placeholder) placeholder.style.display = 'block';
-    img.style.display = 'none';
+    // img.style.display = 'none'; // removed to prevent white flash
 
-    // Evitar que el handler global cree otro placeholder durante la carga
+    // Prevent global handler from injecting another placeholder during load
     img.dataset.noPlaceholder = 'true';
 
-    // Actualizar contador inmediatamente
+    // Update counter immediately
     counter.textContent = `${currentImageIndex + 1} / ${allImages.length}`;
 
     // Remove previous handlers if any
@@ -203,10 +214,11 @@ function updateCarousel() {
       delete img._galleryErrorHandler;
     }
 
-    // Handlers as functions so we can remove them reliably
+    // Define handlers for the visible img (these will run after we assign src)
     const onLoad = function () {
       delete img.dataset.noPlaceholder;
       img.style.display = 'block';
+      try { img.style.opacity = '1'; } catch (e) { /* ignore */ }
       if (placeholder) placeholder.style.display = 'none';
       console.log('Imagen cargada correctamente:', img.src);
       // cleanup
@@ -218,7 +230,6 @@ function updateCarousel() {
 
     const onError = function () {
       console.error('Error cargando imagen:', url);
-      // Si estamos en proceso de cierre/limpieza, ignorar error
       if (ignoreImageErrors || img._ignoreGalleryErrors || img._suppressPlaceholder) {
         delete img.dataset.noPlaceholder;
         img.style.display = 'none';
@@ -245,12 +256,44 @@ function updateCarousel() {
     img.addEventListener('load', onLoad);
     img.addEventListener('error', onError);
 
-    // Asignar la URL (esto dispara la carga)
-    img.src = url;
-    img.alt = `Imagen ${currentImageIndex + 1}`;
+    // Use an off-DOM preloader image: load first, then swap src on the visible img to avoid flash
+    try {
+      const preloader = new Image();
+      preloader.onload = function() {
+        try {
+          // Simple crossfade: fade out current image, swap src (likely cached), then fade in
+          try { img.style.transition = 'opacity 220ms ease-in-out'; } catch (e) { /* ignore */ }
+          try { img.style.opacity = '0'; } catch (e) { /* ignore */ }
 
-    // Log para depuración
-    console.log('Imagen asignada (fetch iniciada):', img.src);
+          // After the fade-out duration, swap the src (preloaded) and fade back in
+          setTimeout(() => {
+            try {
+              img.src = url;
+              img.alt = `Imagen ${currentImageIndex + 1}`;
+              // Use RAF to ensure the browser registers the src change before transitioning opacity to 1
+              requestAnimationFrame(() => {
+                try { img.style.opacity = '1'; } catch (e) { /* ignore */ }
+              });
+            } catch (e) { /* ignore */ }
+          }, 240);
+        } catch (e) { /* ignore */ }
+        // cleanup preloader handlers
+        try { preloader.onload = null; preloader.onerror = null; } catch (e) { /* ignore */ }
+      };
+      preloader.onerror = function() {
+        try { onError(); } catch (e) { /* ignore */ }
+        try { preloader.onload = null; preloader.onerror = null; } catch (e) { /* ignore */ }
+      };
+      // start preload (does not alter the visible img)
+      preloader.src = url;
+
+      console.log('Preload iniciado para:', url);
+    } catch (e) {
+      // fallback: assign directly
+      try { img.src = url; img.alt = `Imagen ${currentImageIndex + 1}`; } catch (e) { /* ignore */ }
+    }
+
+    console.log('Solicitud de carga procesada para:', url);
 
   } catch (e) {
     console.error('Error al actualizar carrusel:', e);
@@ -397,4 +440,3 @@ if (document.readyState === 'loading') {
   // DOM ya cargado
   initGalleryBindings();
 }
-
